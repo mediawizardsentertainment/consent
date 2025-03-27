@@ -3,7 +3,7 @@
             'use strict';
 
             const API_KEY = 'ddc-UL6F10Pi2sdbQFzSzwuvKtTOBnXXMS9xGRKbeUtGnSZQhV3rt2';
-            const API_ENDPOINT = 'https://paid.sree.shop/v1/images/generations';
+            const API_ENDPOINT = 'https://paid.sree.shop/v1';
             
             const DOM = {
                 prompt: document.getElementById('prompt'),

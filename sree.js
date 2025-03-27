@@ -1,104 +1,143 @@
 
-        (function() {
-            'use strict';
+        const API_KEY = 'ddc-beta-1tvcr2al6t-osFkWlvhmErcpEm2hzVF9PDoowrFzYPHdbJ';
+        let isGenerating = false;
+        let currentGeneration = 1;
+        let totalGenerations = 1;
 
-            const API_KEY = 'ddc-beta-1tvcr2al6t-osFkWlvhmErcpEm2hzVF9PDoowrFzYPHdbJ';
-            const API_ENDPOINT = 'https://beta.sree.shop/v1';
+        async function startGeneration() {
+            if (isGenerating) return;
             
-            const DOM = {
-                prompt: document.getElementById('prompt'),
-                model: document.getElementById('model'),
-                generateBtn: document.getElementById('generateBtn'),
-                loading: document.getElementById('loading'),
-                error: document.querySelector('.error-message'),
-                imageGrid: document.getElementById('imageGrid')
+            const num = parseInt(document.getElementById('num').value);
+            totalGenerations = num;
+            currentGeneration = 1;
+            
+            document.getElementById('current-count').textContent = currentGeneration;
+            document.getElementById('total-count').textContent = totalGenerations;
+            
+            await generateImagesSequentially(num);
+        }
+
+        async function generateImagesSequentially(total) {
+            isGenerating = true;
+            const prompt = document.getElementById('prompt').value;
+            const size = document.getElementById('size').value;
+            const loading = document.querySelector('.loading');
+
+            if (!prompt.trim()) {
+                alert('Please enter a description for your image');
+                isGenerating = false;
+                return;
+            }
+
+            loading.style.display = 'block';
+
+            const historyEntry = {
+                timestamp: new Date().toISOString(),
+                prompt: prompt,
+                images: []
             };
 
-            let isGenerating = false;
-
-            function toggleUIState(isLoading) {
-                DOM.generateBtn.disabled = isLoading;
-                DOM.loading.style.display = isLoading ? 'flex' : 'none';
-                DOM.error.textContent = '';
-                isGenerating = isLoading;
-            }
-
-            function createImageCard(url, model) {
-                const card = document.createElement('div');
-                card.className = 'image-card';
-                card.innerHTML = `
-                    <div class="model-tag">${model.split('/')[1]}</div>
-                    <button class="download-btn" aria-label="Download image">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                    </button>
-                    <img src="${url}" alt="Generated image" loading="lazy">
-                `;
-                
-                card.querySelector('.download-btn').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `ai-image-${Date.now()}.jpg`;
-                    link.click();
-                });
-
-                return card;
-            }
-
-            async function handleGeneration() {
-                if (isGenerating) return;
-
-                const prompt = DOM.prompt.value.trim();
-                if (!prompt) {
-                    DOM.error.textContent = 'Please enter a description to generate images';
-                    DOM.prompt.focus();
-                    return;
-                }
-
-                toggleUIState(true);
-                DOM.imageGrid.innerHTML = '';
-
-                try {
-                    const response = await fetch(API_ENDPOINT, {
+            try {
+                for (let i = 0; i < total; i++) {
+                    document.getElementById('current-count').textContent = currentGeneration;
+                    
+                    const response = await fetch('https://beta.sree.shop/v1/images/generations', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${API_KEY}`
                         },
                         body: JSON.stringify({
-                            prompt,
-                            model: DOM.model.value,
-                            n: 4,
-                            size: "1024x1024"
+                            model: "Provider-5/flux-pro",
+                            prompt: prompt,
+                            n: 1,
+                            size: size
                         })
                     });
 
+                    const data = await response.json();
+                    
                     if (!response.ok) {
-                        const error = await response.json();
-                        throw new Error(error.error?.message || 'Failed to generate images');
+                        throw new Error(data.error?.message || `Failed to generate image ${currentGeneration}`);
                     }
 
-                    const { data = [] } = await response.json();
-                    if (!data.length) throw new Error('No images were generated');
+                    if (!data.data || data.data.length === 0) {
+                        throw new Error(`No image generated for ${currentGeneration}`);
+                    }
 
-                    data.forEach(({ url }) => {
-                        DOM.imageGrid.appendChild(createImageCard(url, DOM.model.value));
-                    });
-                } catch (error) {
-                    console.error('Generation error:', error);
-                    DOM.error.textContent = `Error: ${error.message}`;
-                } finally {
-                    toggleUIState(false);
+                    const image = data.data[0];
+                    historyEntry.images.push(image.url);
+                    displayImage(image.url);
+                    currentGeneration++;
                 }
+
+                saveToHistory(historyEntry);
+                loadHistory();
+
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                loading.style.display = 'none';
+                isGenerating = false;
             }
+        }
 
-            DOM.generateBtn.addEventListener('click', handleGeneration);
-            DOM.prompt.addEventListener('keydown', e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleGeneration();
-                }
+        function displayImage(url) {
+            const gallery = document.getElementById('gallery');
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.innerHTML = `
+                <img src="${url}" alt="Generated image">
+                <div class="card-footer">
+                    <a href="${url}" download class="download-btn">
+                        Download
+                    </a>
+                </div>
+            `;
+            gallery.prepend(card);
+        }
+
+        function saveToHistory(entry) {
+            const history = JSON.parse(localStorage.getItem('generationHistory') || '[]');
+            history.unshift(entry);
+            localStorage.setItem('generationHistory', JSON.stringify(history));
+        }
+
+        function loadHistory() {
+            const historyList = document.getElementById('history-list');
+            const history = JSON.parse(localStorage.getItem('generationHistory') || '[]');
+            
+            historyList.innerHTML = '';
+            
+            history.forEach((entry, index) => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerHTML = `
+                    <div class="history-prompt">${entry.prompt}</div>
+                    <div style="color: #888; font-size: 0.85rem;">
+                        ${new Date(entry.timestamp).toLocaleDateString()} - 
+                        ${entry.images.length} image${entry.images.length > 1 ? 's' : ''}
+                    </div>
+                `;
+                item.onclick = () => showHistoryImages(entry.images);
+                historyList.appendChild(item);
             });
-        })();
+        }
+
+        function showHistoryImages(images) {
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            
+            images.forEach(url => {
+                displayImage(url);
+            });
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('generationHistory');
+            loadHistory();
+            document.getElementById('gallery').innerHTML = '';
+        }
+
+        // Initialize history on load
+        loadHistory();

@@ -2,7 +2,7 @@
         (function() {
             'use strict';
 
-            const API_KEY = 'ddc-UL6F10Pi2sdbQFzSzwuvKtTOBnXXMS9xGRKbeUtGnSZQhV3rt2';
+            const API_KEY = 'ddc-beta-1tvcr2al6t-osFkWlvhmErcpEm2hzVF9PDoowrFzYPHdbJ';
             const API_ENDPOINT = 'https://beta.sree.shop/v1/images/generation';
             
             const DOM = {
